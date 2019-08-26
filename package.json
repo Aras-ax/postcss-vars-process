@@ -11,7 +11,8 @@
     ],
     "main": "lib/index.js",
     "scripts": {
-        "test": "jest && eslint *.js"
+        "test": "jest && eslint */*.js",
+        "jest": "jest"
     },
     "author": "moshang-xc <755172990@qq.com>",
     "license": "MIT",
