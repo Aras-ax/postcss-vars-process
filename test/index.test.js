@@ -2,99 +2,25 @@ var postcss = require('postcss')
 
 var plugin = require('../lib/')
 
-function run(input, output, opts) {
-    return postcss([plugin(opts)]).process(input).then(function(result) {
-        expect(result.css).toEqual(output)
-        expect(result.warnings()).toHaveLength(0)
-    })
-}
+const { loadFile } = require('../lib/util');
 
-/* Write tests here
-
-it('does something', function () {
-  return run('a{ }', 'a{ }', { })
-})
-
-*/
-
-function text() {
-    let outArr = [];
-    let input = `.a{
-          font-size: 12px;
-          color: $(main-color);
-          background: url("$(bg)");
-        }
-        input{
-          font-size: $(fontSize);
-          color: $(color);
-          background: $(main-color);
-        }
-        `,
-        values = {
-            'main-color': '#f00',
-            bg: './img/data.png',
-            fontSize: '14px',
-            color: '#aaa'
-        },
-        outPut = `.a{
-        font-size: 12px;
-        color: #f00;
-        background: url("./img/data.png");
-      }
-      input{
-        font-size: 14px;
-        color: #aaa;
-        background: #f00;
-      }
-      `,
-        opts = {
-            extract(arr) {
-                outArr = outArr.concat(arr);
-            },
-            values: './test/data.js'
-        };
-    postcss([plugin(opts)]).process(input).then(function(result) {
-        console.log(outArr);
-        console.log(result.css);
-    });
-}
-
-text();
-
-// 提取变量的正确性
-// 错误处理的正确性
-// values未处理项的正确性
-// value替换的正确性
-// pattern 正确性
-// split验证
-// 参数添加空格
-
-let css = `.a{
-  font-size: 12px;
-  color: $(color|3);
-  background: url("$(bg)");
-}`,
-    outCss = `.a{
+let outCss = `.a{
   font-size: 12px;
   color: #f00;
   background: url("./test.jpg");
-}`,
-    cssVals = {
-        color: '#f00',
-        bg: './test.jpg'
-    };
+}`;
 
 let input = `.a{
-    font-size: 12px;
-    color: $(main-color);
-    background: url("$(bg)");
-  }
-  input{
-    font-size: $(fontSize);
-    color: $(color);
-    background: $(main-color);
-  }
-  `,
+        font-size: 12px;
+        color: $(main-color);
+        background: $(color) url("$(bg)");
+      }
+    input{
+        font-size: $(fontSize);
+        color: $(color);
+        background: $(main-color);
+    }
+    `,
     values = {
         'main-color': '#f00',
         bg: './img/data.png',
@@ -102,70 +28,148 @@ let input = `.a{
         color: '#aaa'
     },
     outPut = `.a{
-  font-size: 12px;
-  color: #f00;
-  background: url("./img/data.png");
-}
-input{
-  font-size: 14px;
-  color: #aaa;
-  background: #f00;
-}
-`;
+        font-size: 12px;
+        color: #f00;
+        background: #aaa url("./img/data.png");
+      }
+    input{
+        font-size: 14px;
+        color: #aaa;
+        background: #f00;
+    }
+    `;
+
+
+// const processor = postcss().use(plugin({
+//     values
+// }));
+// processor.process(input).then(data => {
+//     console.log(1);
+// });
+// return;
 
 describe('postcss-vars-process', () => {
-    it('使用默认参数', () => {
+    it('basic demo use', () => {
         check(input, outPut, {
             values
         });
     });
 
-    // 值不全
-    it('option is empty', () => {
-        check(input, outPut);
+    it('warning when option is empty', () => {
+        checkWarning(input, null, 5);
     });
 
-    // 有错
+    // 工具函数的验证
+    describe('util loadFile', () => {
+        it('load .js file', () => {
+            expect(loadFile('./test/data.js')).toEqual(values);
+        });
+        it('load .json file', () => {
+            expect(loadFile('./test/data.js')).toEqual(values);
+        });
+
+        it('load .md file', () => {
+            expect(new Promise(function() {
+                loadFile('./README.md')
+            })).rejects.toThrow(/File type must be \.js or \.json/);
+        });
+
+        it('load un exist file', () => {
+            expect(new Promise(function() {
+                loadFile('./test/none.js')
+            })).rejects.toThrow(/Unhandled option file:/);
+        });
+    });
 
     describe('plugin options', () => {
-        describe('split', () => {
-            it('set split to &', () => {
+        describe('splitKey', () => {
+            it('set splitKey to &', () => {
                 check(`.a{
                         font-size: 12px;
                         color: $(color&3);
                         background: url("$(bg)");
                       }`, outCss, {
-                    values: cssVals
+                    splitKey: '&',
+                    values: {
+                        color: '#f00',
+                        bg: './test.jpg'
+                    }
                 });
             });
         });
 
         describe('pattern', () => {
-            it('set pattern to /\@\<([^()]+)\>/g', () => {
+            it('with Capturing groups: /\@\<([^<>]+)\>/g', () => {
                 check(`.a{
-            font-size: 12px;
-            color: @<color&3>;
-            background: url("@<bg>");
-          }`, outCss, {
-                    values: cssVals
-                });
+                        font-size: 12px;
+                        color: @<color|3>;
+                        background: url("@<bg>");
+                      }`,
+                    outCss, {
+                        pattern: /\@\<([^<>]+)\>/g,
+                        values: {
+                            color: '#f00',
+                            bg: './test.jpg'
+                        }
+                    });
+            });
+
+            it('without Capturing groups: extract the full expression matched', () => {
+                checkExtract(`.a{
+                    font-size: 12px;
+                    color: $color|3;
+                    background: url("$bg");
+                  }`,
+                    outCss, {
+                        pattern: /\$[^;"\s]+/g,
+                        values: {
+                            $color: '#f00',
+                            $bg: './test.jpg'
+                        }
+                    }, ['$color|3', '$bg']);
             });
         });
 
         describe('extract', () => {
-            it('set extract to string', () => {
+            it('string: extract empty when extract is not function', () => {
+                checkExtract(input, outPut, {
+                    values,
+                    extract: ''
+                }, []);
+            });
+
+            it('function: extract the first capturing group array of the pattern', () => {
                 checkExtract(input, outPut, {
                     values
-                }, []);
+                }, ["main-color", "color", "bg", "fontSize"]);
+            });
+        });
+
+        describe('logType', () => {
+            it(`warn: replaces a lookup that cannot be resolved with an empty string`, () => {
+                check(`.a{
+                  font-size: 12px;
+                  color: $(color|3);
+                  background: url("$(bg)");
+                }`, `.a{
+                  font-size: 12px;
+                  color: #fff;
+                  background: url("");
+                }`, {
+                    values: {
+                        color: '#fff'
+                    }
+                })
+            });
+
+            it('error: throws when a variable can not be resolved', () => {
+                checkWarning(input, { values: {} }, 5);
             });
         });
 
         describe('values', () => {
-
-            it('values is plain object', () => {
-                check(input, outPut, {
-                    values: {}
-                });
+            it('plain object: warning when all the can not be resolved', () => {
+                checkWarning(input, { values: {} }, 5);
             });
 
             it('use .json', () => {
@@ -179,12 +183,14 @@ describe('postcss-vars-process', () => {
                     values: './test/data.js'
                 });
             });
-            it('use not exist data file', () => {
-                check(input, outPut, {
-                    values: './test/none.js'
-                });
+            it('un exits file: throws when file path can not be handled', () => {
+                expect(new Promise(function() {
+                    check(input, outPut, {
+                        values: './test/none.js'
+                    });
+                })).rejects.toThrow(/Unhandled option file:/);
             });
-            it('use Object literal', () => {
+            it('Object literal', () => {
                 check(input, outPut, {
                     values
                 });
@@ -193,37 +199,41 @@ describe('postcss-vars-process', () => {
     });
 
     function check(input, output, opts) {
-        // const processor = postcss().use(plugin(options));
-        // // if (expected instanceof RegExp) {
-        // //     expect(() => {
-        // //         return processor.process(stripTabs(actual)).css;
-        // //     }).toThrow(expected);
-        // //     return;
-        // // }
-        // expect(
-        //     processor.process(stripTabs(actual)).css
-        // ).toEqual(
-        //     stripTabs(expected)
-        // );
-
-        postcss([plugin(opts)]).process(input).then(function(result) {
-            expect(result.css).toEqual(output);
-        })
+        const processor = postcss().use(plugin(opts));
+        expect(
+            stripSpace(processor.process(input).css)
+        ).toEqual(
+            stripSpace(output)
+        );
     }
 
     function checkExtract(input, output, opts, outArrs) {
         let vars = [];
-        opts.extract = function(arr) {
-            vars = vars.concat(arr);
+        if (opts.extract === undefined) {
+            opts.extract = function(arr) {
+                vars = vars.concat(arr);
+            }
         }
-        postcss([plugin(opts)]).process(input).then(function(result) {
-            expect(result.css).toEqual(output);
-            expect(vars).toEqual(outArrs);
-        })
+
+        const processor = postcss().use(plugin(opts));
+        expect(stripSpace(processor.process(input).css)).toEqual(stripSpace(output));
+        expect(vars).toEqual(outArrs);
     }
 
-    function stripTabs(input) {
-        return input.replace(/\t/g, '');
+    function checkError(input, opts) {
+        const processor = postcss().use(plugin(opts));
+        expect(() => {
+            return processor.process(stripSpace(input)).css;
+        }).toThrow();
+    }
+
+    function checkWarning(input, opts, len) {
+        const processor = postcss().use(plugin(opts));
+        expect(processor.process(stripSpace(input)).warnings()).toHaveLength(len);
+    }
+
+    function stripSpace(input) {
+        return input.replace(/\s/g, '');
     }
 
 });
