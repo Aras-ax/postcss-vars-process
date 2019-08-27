@@ -1,6 +1,6 @@
 # PostCSS Vars Process [![Build Status][ci-img]][ci]
 
-[PostCSS] plugin to extract and replace variables in the css file, support legal custom format variables. Extract variables array for secondary development or other use, and replace variables based on the given value.
+[PostCSS] plugin to extract and replace variables form css, support legal custom format variables. Extract variables array for secondary development or other use, and replace variables based on the given value.
 
 [PostCSS]: https://github.com/postcss/postcss
 [ci-img]:  https://travis-ci.org/moshang-xc/postcss-vars-process.svg
