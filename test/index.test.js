@@ -123,7 +123,7 @@ describe('postcss-vars-process', () => {
                     outCss, {
                         pattern: /\$[^;"\s]+/g,
                         values: {
-                            $color: '#f00',
+                            '$color|3': '#f00',
                             $bg: './test.jpg'
                         }
                     }, ['$color|3', '$bg']);
