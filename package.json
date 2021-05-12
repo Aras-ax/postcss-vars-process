@@ -23,7 +23,7 @@
   },
   "homepage": "https://github.com/moshang-xc/postcss-vars-process",
   "dependencies": {
-    "postcss": "^7.0.6"
+    "postcss": "^8.2.10"
   },
   "devDependencies": {
     "@logux/eslint-config": "^27.0.0",
